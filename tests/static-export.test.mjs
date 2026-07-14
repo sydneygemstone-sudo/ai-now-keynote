@@ -19,7 +19,9 @@ test("exports a self-contained GitHub Pages entry", async () => {
 test("wires the toolkit generator to a clipboard-ready prompt", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
-  assert.match(source, /onClick=\{\(\) => onCopy\(copyLabel, toolkitPrompt\)\}/);
+  assert.match(source, /success = document\.execCommand\("copy"\)/);
+  assert.match(source, /await navigator\.clipboard\.writeText\(prompt\)/);
   assert.match(source, /提示词已复制/);
+  assert.match(source, /浏览器阻止了自动复制，请按 ⌘C/);
   assert.match(source, /直接生成一个可使用的单页交互工具/);
 });

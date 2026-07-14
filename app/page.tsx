@@ -360,10 +360,11 @@ const toolkits = [
   { id: "business", icon: "▦", name: "小生意仪表盘", desc: "订单、库存、现金与下一步动作", tasks: ["处理待发订单", "补充低库存", "检查本周现金"] },
 ];
 
-function ToolsView({ copied, onCopy, onBack }: { copied: string | null; onCopy: (label: string, prompt: string) => void; onBack: () => void }) {
+function ToolsView({ copied, onCopy, onBack }: { copied: string | null; onCopy: (label: string, prompt: string) => Promise<boolean>; onBack: () => void }) {
   const topic = topics[4];
   const [selected, setSelected] = useState(1);
   const [checked, setChecked] = useState<number[]>([0]);
+  const [manualCopy, setManualCopy] = useState(false);
   const toolkit = toolkits[selected];
   const selectedTasks = checked.map((index) => toolkit.tasks[index]);
   const toolkitPrompt = `请为我制作一个“${toolkit.name}”数字工具包。场景说明：${toolkit.desc}。
@@ -379,12 +380,16 @@ ${selectedTasks.length ? selectedTasks.map((task, index) => `${index + 1}. ${tas
 - 不编造个人数据，不确定处留成可编辑字段；
 - 完成后给我可直接打开的文件、使用方法和自测结果。`;
   const copyLabel = `生成${toolkit.name}版本`;
+  const generateVersion = async () => {
+    const success = await onCopy(copyLabel, toolkitPrompt);
+    setManualCopy(!success);
+  };
   return (
     <div className="topic-content tools-layout">
       <TopicHeader topic={topic} onBack={onBack} />
       <div className="toolkit-picker">
         {toolkits.map((item, index) => (
-          <button className={selected === index ? "active" : ""} onClick={() => { setSelected(index); setChecked([0]); }} key={item.id}>
+          <button className={selected === index ? "active" : ""} onClick={() => { setSelected(index); setChecked([0]); setManualCopy(false); }} key={item.id}>
             <i>{item.icon}</i><strong>{item.name}</strong><span>{item.desc}</span>
           </button>
         ))}
@@ -404,7 +409,8 @@ ${selectedTasks.length ? selectedTasks.map((task, index) => `${index + 1}. ${tas
             ><i>{checked.includes(index) ? "✓" : ""}</i><span>{task}</span><b>今天</b></button>
           ))}
         </div>
-        <div className="mini-footer"><span>可勾选 · 会计算 · 能打印 · 可继续改</span><button onClick={() => onCopy(copyLabel, toolkitPrompt)}>{copied === copyLabel ? "✓ 提示词已复制" : "生成我的版本"}</button></div>
+        <div className="mini-footer"><span>可勾选 · 会计算 · 能打印 · 可继续改</span><button onClick={generateVersion}>{copied === copyLabel ? "✓ 提示词已复制" : manualCopy ? "复制受限 · 提示词已展开" : "生成我的版本"}</button></div>
+        {manualCopy && <div className="copy-fallback"><strong>浏览器阻止了自动复制，请按 ⌘C</strong><textarea readOnly value={toolkitPrompt} onFocus={(event) => event.currentTarget.select()} autoFocus /></div>}
       </div>
       <div className="case-strip">
         <span>真实项目结构</span>
@@ -600,25 +606,45 @@ export default function Home() {
     return () => window.clearInterval(timer);
   }, [running]);
 
-  const copy = useCallback(async (label: string, prompt: string) => {
+  const copy = useCallback(async (label: string, prompt: string): Promise<boolean> => {
+    let success = false;
+
     try {
-      if (navigator.clipboard?.writeText) {
+      const activeElement = document.activeElement as HTMLElement | null;
+      const textarea = document.createElement("textarea");
+      textarea.value = prompt;
+      textarea.readOnly = true;
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      textarea.style.top = "0";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      textarea.setSelectionRange(0, prompt.length);
+      success = document.execCommand("copy");
+      textarea.remove();
+      activeElement?.focus();
+    } catch {
+      success = false;
+    }
+
+    if (!success && navigator.clipboard?.writeText) {
+      try {
         await navigator.clipboard.writeText(prompt);
-      } else {
-        const textarea = document.createElement("textarea");
-        textarea.value = prompt;
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand("copy");
-        textarea.remove();
+        success = true;
+      } catch {
+        success = false;
       }
+    }
+
+    if (success) {
       setCopied(label);
       window.setTimeout(() => setCopied(null), 1800);
-    } catch {
+    } else {
       setCopied(null);
     }
+    return success;
   }, []);
 
   const fullscreen = useCallback(async () => {
