@@ -15,3 +15,11 @@ test("exports a self-contained GitHub Pages entry", async () => {
   await access(new URL("../out/showcase/openai-gpt56.jpg", import.meta.url));
   await access(new URL("../out/dukou/bg-ending.jpg", import.meta.url));
 });
+
+test("wires the toolkit generator to a clipboard-ready prompt", async () => {
+  const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /onClick=\{\(\) => onCopy\(copyLabel, toolkitPrompt\)\}/);
+  assert.match(source, /提示词已复制/);
+  assert.match(source, /直接生成一个可使用的单页交互工具/);
+});

@@ -360,11 +360,25 @@ const toolkits = [
   { id: "business", icon: "▦", name: "小生意仪表盘", desc: "订单、库存、现金与下一步动作", tasks: ["处理待发订单", "补充低库存", "检查本周现金"] },
 ];
 
-function ToolsView({ onBack }: { onBack: () => void }) {
+function ToolsView({ copied, onCopy, onBack }: { copied: string | null; onCopy: (label: string, prompt: string) => void; onBack: () => void }) {
   const topic = topics[4];
   const [selected, setSelected] = useState(1);
   const [checked, setChecked] = useState<number[]>([0]);
   const toolkit = toolkits[selected];
+  const selectedTasks = checked.map((index) => toolkit.tasks[index]);
+  const toolkitPrompt = `请为我制作一个“${toolkit.name}”数字工具包。场景说明：${toolkit.desc}。
+
+今天优先处理：
+${selectedTasks.length ? selectedTasks.map((task, index) => `${index + 1}. ${task}`).join("\n") : "1. 请先帮我确定今天最重要的一项任务"}
+
+交付要求：
+- 不要只写建议或大纲，直接生成一个可使用的单页交互工具；
+- 包含可勾选任务、完成进度、日期、备注和下一步；
+- 支持手机与笔记本，支持打印或导出 PDF；
+- 文案清楚、字号足够大，普通人无需学习即可使用；
+- 不编造个人数据，不确定处留成可编辑字段；
+- 完成后给我可直接打开的文件、使用方法和自测结果。`;
+  const copyLabel = `生成${toolkit.name}版本`;
   return (
     <div className="topic-content tools-layout">
       <TopicHeader topic={topic} onBack={onBack} />
@@ -390,7 +404,7 @@ function ToolsView({ onBack }: { onBack: () => void }) {
             ><i>{checked.includes(index) ? "✓" : ""}</i><span>{task}</span><b>今天</b></button>
           ))}
         </div>
-        <div className="mini-footer"><span>可勾选 · 会计算 · 能打印 · 可继续改</span><button>生成我的版本</button></div>
+        <div className="mini-footer"><span>可勾选 · 会计算 · 能打印 · 可继续改</span><button onClick={() => onCopy(copyLabel, toolkitPrompt)}>{copied === copyLabel ? "✓ 提示词已复制" : "生成我的版本"}</button></div>
       </div>
       <div className="case-strip">
         <span>真实项目结构</span>
@@ -588,7 +602,18 @@ export default function Home() {
 
   const copy = useCallback(async (label: string, prompt: string) => {
     try {
-      await navigator.clipboard.writeText(prompt);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(prompt);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = prompt;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        textarea.remove();
+      }
       setCopied(label);
       window.setTimeout(() => setCopied(null), 1800);
     } catch {
@@ -672,7 +697,7 @@ export default function Home() {
       {view === "create" && <CreateView copied={copied} onCopy={copy} onBack={() => setRoute("map")} />}
       {view === "research" && <ResearchView copied={copied} onCopy={copy} onBack={() => setRoute("map")} />}
       {view === "computer" && <ComputerView copied={copied} onCopy={copy} onBack={() => setRoute("map")} />}
-      {view === "tools" && <ToolsView onBack={() => setRoute("map")} />}
+      {view === "tools" && <ToolsView copied={copied} onCopy={copy} onBack={() => setRoute("map")} />}
       {view === "build" && <BuildView copied={copied} onCopy={copy} onBack={() => setRoute("map")} />}
       {view === "magic" && <MagicView copied={copied} onCopy={copy} onBack={() => setRoute("map")} />}
 
